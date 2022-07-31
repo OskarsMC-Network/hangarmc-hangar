@@ -36,6 +36,12 @@ DEFAULT_OFFSET = 0
 class Hangar:
     def __init__(self, base_url: str = MINIDIGGER_INSTANCE,
                  user_agent: str = USER_AGENT):  # TODO: add paper and sponge instances
+        """
+        Create a Hangar v1 SDK instance.
+
+        :param base_url: A base url for the hangar instance, must end with `v1/`
+        :param user_agent: A user agent for your application, ideally `yourapp/version`
+        """
         self.base_url = base_url
         self.client = urllib3.PoolManager(headers={
             'User-Agent': user_agent,
@@ -56,6 +62,13 @@ class Hangar:
 
     # Authentication
     def authenticate(self, api_key: str, set_jwt: bool = True) -> HangarApiSession:
+        """
+        Log-in with your API key in order to be able to call other endpoints authenticated.
+
+        :param api_key: JWT
+        :param set_jwt: Automatically set the token returned as the token to used to authenticate future requests.
+        :return: A <code>HangarApiSession</code> instance
+        """
         request = self.client.request('POST',
                                       urllib.parse.urljoin(self.base_url, 'authenticate') + '?apiKey=' + api_key)
         data = orjson.loads(request.data)
@@ -67,6 +80,12 @@ class Hangar:
 
     # API Keys
     def get_api_keys(self) -> List[HangarApiKey]:
+        """
+        Fetches a list of API Keys.
+        Requires the `edit_api_keys` permission.
+
+        :return: A list of API keys.
+        """
         request = self.client.request('GET', urllib.parse.urljoin(self.base_url, 'keys'))
         data = orjson.loads(request.data)
         if request.status == 200:
@@ -74,15 +93,31 @@ class Hangar:
         raise HangarApiException(request.status, data)
 
     def create_api_key(self, name: str, permissions: List[HangarPermissions]) -> str:
+        """
+        Creates an API key.
+        Requires the `edit_api_keys` permission.
+
+        :param name: Name of the API key.
+        :param permissions: A list of HangarPermissions for the API key to have.
+        :return: An api key, for use with the authenticate endpoint. (Hangar#authenticate(key))
+        """
         request = self.client.request('POST', urllib.parse.urljoin(self.base_url, 'keys'),
-                                      body={'name': name,
-                                            'permissions': [permission.value for permission in permissions]})
+                                      body=orjson.dumps({'name': name,
+                                                         'permissions': [permission.value for permission in
+                                                                         permissions]}))
         data = orjson.loads(request.data)
         if request.status == 201:
             return data
         raise HangarApiException(request.status, data)
 
     def delete_api_key(self, name: str) -> None:
+        """
+        Deletes an API key.
+        Requires the `edit_api_keys` permission.
+
+        :param name: The name of the key to delete
+        :return:
+        """
         request = self.client.request('DELETE', urllib.parse.urljoin(self.base_url, 'keys' + '?name=' + name))
         data = orjson.loads(request.data)
         if request.status == 204:
@@ -91,6 +126,13 @@ class Hangar:
 
     # Permissions
     def repository_permissions(self, author: str, slug: str) -> HangarUserPermissions:
+        """
+        Returns a list of permissions you have in a repository
+
+        :param author: The owner of the project to get the permissions for.
+        :param slug: The slug of the project get the permissions for.
+        :return: A list of permissions you have in the given repository.
+        """
         request = self.client.request('GET', urllib.parse.urljoin(self.base_url,
                                                                   'permissions' + f'?author={author}&slug={slug}'))
         data = orjson.loads(request.data)
@@ -99,6 +141,12 @@ class Hangar:
         raise HangarApiException(request.status, data)
 
     def organisation_permissions(self, organisation: str) -> HangarUserPermissions:
+        """
+        Returns a list of permissions you have in an organisation.
+
+        :param organisation: The organisation to check permissions in.
+        :return: a list of permissions you have in the given organisation.
+        """
         request = self.client.request('GET', urllib.parse.urljoin(self.base_url,
                                                                   'permissions' + f'?organisation={organisation}'))
         data = orjson.loads(request.data)
@@ -119,6 +167,22 @@ class Hangar:
                         search_sort: HangarSearchSort = None,
                         search_version: str = None,
                         order_with_relevance: bool = True) -> HangarPaginatedProjectResult:
+        """
+        Searches all the projects on Hangar, or for a single user.
+        Requires the `view_public_info` permission.
+
+        :param search_query: The query to use when searching
+        :param search_limit: The maximum amount of items to return
+        :param search_category: A category to filter for
+        :param search_license: A license to filter for
+        :param search_owner: The author of the project
+        :param search_platform: A platform to filter for
+        :param search_offset: Where to start searching
+        :param search_sort: Used to sort the result
+        :param search_version: A Minecraft version to filter for
+        :param order_with_relevance: Whether projects should be sorted by the relevance to the given query
+        :return: A paginated <code>HangarProject</code> result
+        """
         params = {
             "q": search_query,
             "category": search_category,
@@ -145,6 +209,14 @@ class Hangar:
         raise HangarApiException(request.status, data)
 
     def get_project(self, author: str, slug: str) -> HangarProject:
+        """
+        Returns info on a specific project.
+        Requires the `view_public_info` permission.
+
+        :param author: The author of the project to return
+        :param slug: The slug of the project to return
+        :return: A <code>HangarProject</code> instance
+        """
         request = self.client.request('GET', urllib.parse.urljoin(self.base_url, f'projects/{author}/{slug}'))
         data = orjson.loads(request.data)
         if request.status == 200:
@@ -154,6 +226,16 @@ class Hangar:
     def get_project_members(self, author: str, slug: str,
                             limit: int = DEFAULT_LIMIT,
                             offset: int = DEFAULT_OFFSET) -> HangarPaginatedProjectMemberResult:
+        """
+        Returns the members of a project.
+        Requires the `view_public_info` permission.
+
+        :param author: The author of the project to return members for
+        :param slug: The slug of the project to return members for
+        :param limit: The maximum amount of items to return
+        :param offset: Where to start searching
+        :return: A paginated <code>HangarProjectMember</code> result
+        """
         params = self._process_parameters({'offset': offset, 'limit': limit})
         request = self.client.request('GET',
                                       urllib.parse.urljoin(self.base_url, f'projects/{author}/{slug}/members?{params}'))
@@ -184,12 +266,32 @@ class Hangar:
 
     def get_project_stargazers(self, author: str, slug: str, limit: int = DEFAULT_LIMIT,
                                offset: int = DEFAULT_OFFSET) -> HangarPaginatedUserResult:
+        """
+        Returns the stargazers of a project.
+        Requires the `view_public_info` permission.
+
+        :param author: The author of the project to return stargazers for
+        :param slug: The slug of the project to return stargazers for
+        :param limit: The maximum amount of items to return
+        :param offset: Where to start searching
+        :return: A paginated <code>HangarUser</code> result
+        """
         return self._get_project_user_pagination(author, slug, 'stargazers', limit, offset)
 
     def get_project_stats(self, author: str, slug: str,
                           from_date: datetime.date,
                           to_date: datetime.date) -> Dict[datetime.date, HangarDayProjectStatistics]:
-        params = self._process_parameters({'from': from_date.isoformat(), 'to': to_date.isoformat()})
+        """
+        Returns the stats (downloads and views) for a project per day for a certain date range.
+        Requires the `is_subject_member` permission.
+
+        :param author: The author of the project to return statistics for
+        :param slug: The slug of the project to return stats for
+        :param from_date: The first date to include in the result
+        :param to_date: The last date to include in the result
+        :return: A dictionary, with <code>datetime.date</code> keys and <code>HangarDayProjectStatistics</code> values.
+        """
+        params = self._process_parameters({'from': from_date, 'to': to_date})
 
         request = self.client.request('GET',
                                       urllib.parse.urljoin(self.base_url, f'projects/{author}/{slug}/stats?{params}'))
@@ -202,13 +304,36 @@ class Hangar:
 
     def get_project_watchers(self, author: str, slug: str, limit: int = DEFAULT_LIMIT,
                              offset: int = DEFAULT_OFFSET) -> HangarPaginatedUserResult:
+        """
+        Returns the watchers of a project.
+        Requires the `view_public_info` permission.
+
+        :param author: The author of the project to return watchers for
+        :param slug: The slug of the project to return watchers for
+        :param limit: The maximum amount of items to return
+        :param offset: Where to start searching
+        :return: A paginated <code>HangarUser</code> result.
+        """
         return self._get_project_user_pagination(author, slug, 'watchers', limit, offset)
 
     # Projects - Versions
     def get_project_versions(self, author: str, slug: str, channel: str = None, limit: int = DEFAULT_LIMIT,
                              offset: int = DEFAULT_OFFSET, platform: str = None,
                              version_tag: str = None) -> HangarPaginatedVersionResult:
-        params = {'channel': channel, 'limit': limit, 'offset': offset, 'platform': platform, 'versionTag': version_tag}
+        """
+        Returns all versions of a project.
+        Requires the `view_public_info` permission in the project or owning organization.
+
+        :param author: The author of the project to return versions for
+        :param slug: The slug of the project to return versions for
+        :param channel: A name of a version channel to filter for
+        :param limit: The maximum amount of items to return
+        :param offset: Where to start searching
+        :param platform: A platform name to filter for
+        :param version_tag: A version tag to filter for
+        :return: A paginated <code>HangarVersion</code> result
+        """
+        params = {'channel': channel, 'limit': limit, 'offset': offset, 'platform': platform, 'vTag': version_tag}
 
         params = self._process_parameters(params)
 
@@ -224,6 +349,15 @@ class Hangar:
         raise HangarApiException(request.status, data)
 
     def get_project_version(self, author: str, slug: str, name: str) -> List[HangarVersion]:
+        """
+        Returns versions of a project with the specified version string.
+        Requires the `view_public_info` permission in the project or owning organization.
+
+        :param author: The author of the project to return versions for
+        :param slug: The slug of the project to return versions for
+        :param name: The name of the versions to return
+        :return: A list of <code>HangarVersion</code>s
+        """
         request = self.client.request('GET',
                                       urllib.parse.urljoin(self.base_url, f'projects/{author}/{slug}/versions/{name}'))
         data = orjson.loads(request.data)
@@ -232,6 +366,16 @@ class Hangar:
         raise HangarApiException(request.status, data)
 
     def get_project_version_for_platform(self, author: str, slug: str, name: str, platform: str) -> HangarVersion:
+        """
+        Returns a specific version of a project.
+        Requires the `view_public_info` permission in the project or owning organization.
+
+        :param author: The author of the project to return the version for
+        :param slug: The slug of the version to return
+        :param name: The name of the version to return
+        :param platform: The platform of the version to return
+        :return: A <code>HangarVersion</code> instance
+        """
         request = self.client.request('GET',
                                       urllib.parse.urljoin(self.base_url,
                                                            f'projects/{author}/{slug}/versions/{name}/{platform}'))
@@ -240,7 +384,9 @@ class Hangar:
             return parse_version(data['result'])
         raise HangarApiException(request.status, data)
 
-    def download_version(self, author: str, slug: str, name: str, platform: str) -> BytesIO:
+    def download_version(self, author: str, slug: str, name: str,
+                         platform: str) -> BytesIO:
+        # TODO: accept external urls correctly, return custom class instead of binary?
         request = self.client.request('GET',
                                       urllib.parse.urljoin(self.base_url,
                                                            f'projects/{author}/{slug}'
@@ -277,6 +423,15 @@ class Hangar:
 
     def get_authors(self, limit: int = DEFAULT_LIMIT, offset: int = DEFAULT_OFFSET,
                     sort: HangarAuthorSort = None) -> HangarPaginatedUserResult:
+        """
+        Returns all users that have at least one public project.
+        Requires the `view_public_info` permission.
+
+        :param limit: The maximum amount of items to return
+        :param offset: Where to start watching
+        :param sort: Used to sort the result
+        :return: A paginated <code>HangarUser</code> result
+        """
         params = {
             'offset': offset,
             'limit': limit,
@@ -287,6 +442,15 @@ class Hangar:
 
     def get_staff(self, limit: int = DEFAULT_LIMIT, offset: int = DEFAULT_OFFSET,
                   sort: HangarStaffSort = None) -> HangarPaginatedUserResult:
+        """
+        Returns Hangar staff.
+        Requires the `view_public_info` permission.
+
+        :param limit: The maximum amount of items to return
+        :param offset: Where to start searching
+        :param sort: Used to sort the result
+        :return: A paginated <code>HangarUser</code> result
+        """
         params = {
             'offset': offset,
             'limit': limit,
@@ -297,6 +461,14 @@ class Hangar:
 
     def get_users(self, query: str, limit: int = DEFAULT_LIMIT,
                   offset: int = DEFAULT_OFFSET) -> HangarPaginatedUserResult:
+        """
+        Returns a list of users based on a search query
+
+        :param query: The search query
+        :param limit: The maximum amount of items to return
+        :param offset: Where to start searching
+        :return: A paginated <code>HangarUser</code> result
+        """
         params = {
             'offset': offset,
             'limit': limit,
@@ -306,6 +478,13 @@ class Hangar:
         return self._get_paginated_user_result('users', params)
 
     def get_user(self, user: str) -> HangarUser:
+        """
+        Returns a specific user.
+        Requries the `view_public_info` permission.
+
+        :param user: The name of the user to return
+        :return: A <code>HangarUser</code> instance
+        """
         request = self.client.request('GET', urllib.parse.urljoin(self.base_url, f'users/{user}'))
         data = orjson.loads(request.data)
 
@@ -314,6 +493,13 @@ class Hangar:
         raise HangarApiException(request.status, data)
 
     def get_user_pinned_projects(self, user: str) -> List[HangarCompactProject]:
+        """
+        Returns the pinned projects for a specific user.
+        Requires the `view_public_info` permission
+
+        :param user: The user to return pinned projects for
+        :return: A list of <code>HangarCompactProject</code>s
+        """
         request = self.client.request('GET', urllib.parse.urljoin(self.base_url, f'users/{user}/pinned'))
         data = orjson.loads(request.data)
 
@@ -345,9 +531,28 @@ class Hangar:
     def get_user_starred_projects(self, user: str, limit: int = DEFAULT_LIMIT,
                                   offset: int = DEFAULT_OFFSET,
                                   sort: HangarCompactProjectSort = None) -> HangarPaginatedCompactProjectResult:
+        """
+        Returns the starred projects for a specific user.
+        Requires the `view_public_info` permission.
+
+        :param user: The user to return starred projects for
+        :param limit: The maximum amount of items to return
+        :param offset: Where to start searching
+        :param sort: How to sort the projects
+        :return: A paginated <code>HangarCompactProject</code> result
+        """
         return self._get_user_compact_project('starred', user, limit, offset, sort)
 
     def get_user_watching_projects(self, user: str, limit: int = DEFAULT_LIMIT,
                                    offset: int = DEFAULT_OFFSET,
                                    sort: HangarCompactProjectSort = None) -> HangarPaginatedCompactProjectResult:
+        """
+        Returns the watched projects for a specific user.
+        Requires the `view_public_info` permission.
+        :param user: The user to return watched projects for
+        :param limit: The maximum amount of items to return
+        :param offset: Where to start searching
+        :param sort: How to sort the projects
+        :return: A paginated <code>HangarCompactProject</code> result
+        """
         return self._get_user_compact_project('watching', user, limit, offset, sort)
