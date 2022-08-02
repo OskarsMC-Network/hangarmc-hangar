@@ -49,32 +49,32 @@ class Hangar:
         )
 
     @property
-    def jwt(self) -> str:
+    def token(self) -> str:
         return str(self.client.headers['Authorization']).removeprefix('HangarAuth ')
 
-    @jwt.setter
-    def jwt(self, jwt: str) -> None:
-        self.client.headers['Authorization'] = 'HangarAuth ' + jwt
+    @token.setter
+    def token(self, token: str) -> None:
+        self.client.headers['Authorization'] = 'HangarAuth ' + token
 
     @staticmethod
     def _process_parameters(parameters: Dict[str, Any]) -> str:
         return urllib.parse.urlencode({k: v for k, v in parameters.items() if v is not None})
 
     # Authentication
-    def authenticate(self, api_key: str, set_jwt: bool = True) -> HangarApiSession:
+    def authenticate(self, api_key: str, set_token: bool = True) -> HangarApiSession:
         """
         Log-in with your API key in order to be able to call other endpoints authenticated.
 
         :param api_key: JWT
-        :param set_jwt: Automatically set the token returned as the token to used to authenticate future requests.
+        :param set_token: Automatically set the token returned as the token to used to authenticate future requests.
         :return: A <code>HangarApiSession</code> instance
         """
         request = self.client.request('POST',
                                       urllib.parse.urljoin(self.base_url, 'authenticate') + '?apiKey=' + api_key)
         data = orjson.loads(request.data)
         if request.status == 200 or request.status == 201:
-            if set_jwt:
-                self.jwt = data['token']
+            if set_token:
+                self.token = data['token']
             return HangarApiSession(data['expiresIn'], data['token'])
         raise HangarAuthenticationException(request.status, data)
 
