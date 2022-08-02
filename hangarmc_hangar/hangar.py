@@ -2,7 +2,7 @@ import datetime
 import urllib
 import urllib.parse
 from io import BytesIO
-from typing import List, Dict, Any
+from typing import List, Dict, Any, Tuple, Literal
 
 import dateutil
 import dateutil.parser
@@ -144,8 +144,8 @@ class Hangar:
         """
         Returns a list of permissions you have in an organisation.
 
-        :param organisation: The organisation to check permissions in.
-        :return: a list of permissions you have in the given organisation.
+        :param organisation: The organisation to check permissions in
+        :return: a list of permissions you have in the given organisation
         """
         request = self.client.request('GET', urllib.parse.urljoin(self.base_url,
                                                                   'permissions' + f'?organisation={organisation}'))
@@ -154,7 +154,98 @@ class Hangar:
             return parse_user_permissions(data)
         raise HangarApiException(request.status, data)
 
-    # TODO: hasAny & hasAll, see https://discord.com/channels/855123416889163777/859516358281396234/997605343012077629
+    def global_permissions(self) -> HangarUserPermissions:
+        """
+        Returns a list of permissions you have globally.
+
+        :return: a list of permissions you have globally
+        """
+        request = self.client.request('GET', urllib.parse.urljoin(self.base_url, 'permissions')
+        data = orjson.loads(request.data)
+        if request.status == 200:
+            return parse_user_permissions(data)
+        raise HangarApiException(request.status, data)
+
+    def _run_permission_check(self, check_type: str, permissions: List[HangarPermissions], author: str = None,
+                              slug: str = None, organization: str = None) -> Tuple[bool, str]:
+        params = {
+            "author": author,
+            "slug": slug,
+            "organization": organization
+        }
+
+        string_params = ''
+        for permission in permissions:
+            string_params += f"permissions={permission.value}&"
+        string_params += self._process_parameters(params)
+
+        request = self.client.request('GET', urllib.parse.urljoin(self.base_url, f"has{check_type}?{string_params}"))
+        data = orjson.loads(request.data)
+        if request.status == 200:
+            return data["result"], data['type']
+        raise HangarApiException(request.status, data)
+
+    def has_all_permissions_in_project(self, author: str, slug: str,
+                                       permissions: List[HangarPermissions]) -> Tuple[bool, str]:
+        """
+        Checks whether you have all the provided permissions in the given project.
+
+        :param author: The owner of the project to check permissions in
+        :param slug: The project slug of the project to check permissions in
+        :param permissions: The permissions to check
+        :return: result, scope
+        """
+        return self._run_permission_check('All', permissions, author, slug)
+
+    def has_all_permissions_in_organization(self, organization: str, permissions: List[HangarPermissions]) -> Tuple[bool, str]:
+        """
+        Checks whether you have all the provided permissions in the given organization.
+
+        :param organization: The organization to check permissions in
+        :param permissions: The permissions to check
+        :return: result, scope
+        """
+        return self._run_permission_check('All', permissions, organization=organization)
+
+    def has_all_permissions_globally(self, permissions: List[HangarPermissions]) -> Tuple[bool, str]:
+        """
+        Checks whether you have all the provided permissions globally.
+
+        :param permissions: The permissions to check
+        :return: result, scope
+        """
+        return self._run_permission_check('All', permissions)
+
+    def has_any_permissions_in_project(self, author: str, slug: str,
+                                       permissions: List[HangarPermissions]) -> Tuple[bool, str]:
+        """
+        Checks whether you have any of the provided permissions in the given project.
+
+        :param author: The owner of the project to check permissions in
+        :param slug: The project slug of the project to check permissions in
+        :param permissions: The permissions to check
+        :return: result, scope
+        """
+        return self._run_permission_check('Any', permissions, author, slug)
+
+    def has_any_permissions_in_organization(self, organization: str, permissions: List[HangarPermissions]) -> Tuple[bool, str]:
+        """
+        Checks whether you have any of the provided permissions in the given organization.
+
+        :param organization: The organization to check permissions in
+        :param permissions: The permissions to check
+        :return: result, scope
+        """
+        return self._run_permission_check('Any', permissions, organization=organization)
+
+    def has_any_permissions_globally(self, permissions: List[HangarPermissions]) -> Tuple[bool, str]:
+        """
+        Checks whether you have any of the provided permissions globally.
+
+        :param permissions: The permissions to check
+        :return: result, scope
+        """
+        return self._run_permission_check('Any', permissions)
 
     # Projects - Projects
     def search_projects(self, search_query: str = None,
