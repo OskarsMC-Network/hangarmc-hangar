@@ -2,7 +2,7 @@ import datetime
 import urllib
 import urllib.parse
 from io import BytesIO
-from typing import List, Dict, Any, Tuple, Literal
+from typing import List, Dict, Any, Tuple
 
 import dateutil
 import dateutil.parser
@@ -160,7 +160,7 @@ class Hangar:
 
         :return: a list of permissions you have globally
         """
-        request = self.client.request('GET', urllib.parse.urljoin(self.base_url, 'permissions')
+        request = self.client.request('GET', urllib.parse.urljoin(self.base_url, 'permissions'))
         data = orjson.loads(request.data)
         if request.status == 200:
             return parse_user_permissions(data)
@@ -197,7 +197,8 @@ class Hangar:
         """
         return self._run_permission_check('All', permissions, author, slug)
 
-    def has_all_permissions_in_organization(self, organization: str, permissions: List[HangarPermissions]) -> Tuple[bool, str]:
+    def has_all_permissions_in_organization(self, organization: str,
+                                            permissions: List[HangarPermissions]) -> Tuple[bool, str]:
         """
         Checks whether you have all the provided permissions in the given organization.
 
@@ -228,7 +229,8 @@ class Hangar:
         """
         return self._run_permission_check('Any', permissions, author, slug)
 
-    def has_any_permissions_in_organization(self, organization: str, permissions: List[HangarPermissions]) -> Tuple[bool, str]:
+    def has_any_permissions_in_organization(self, organization: str,
+                                            permissions: List[HangarPermissions]) -> Tuple[bool, str]:
         """
         Checks whether you have any of the provided permissions in the given organization.
 
